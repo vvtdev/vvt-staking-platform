@@ -1,358 +1,513 @@
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button.jsx'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
-import { Badge } from '@/components/ui/badge.jsx'
-import { Progress } from '@/components/ui/progress.jsx'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx'
-import { Input } from '@/components/ui/input.jsx'
-import { Label } from '@/components/ui/label.jsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts'
-import { Coins, TrendingUp, DollarSign, Lock, Unlock, Gift, Users, ArrowUpRight, ArrowDownRight, Wallet, Clock, Star, Shield, Zap, Target } from 'lucide-react'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
+import { Button } from './components/ui/button';
+import { Badge } from './components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
+import { Progress } from './components/ui/progress';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { Input } from './components/ui/input';
+import { Label } from './components/ui/label';
+import { 
+  Wallet, 
+  TrendingUp, 
+  Users, 
+  DollarSign, 
+  Lock, 
+  Clock, 
+  Shield, 
+  ExternalLink,
+  AlertTriangle,
+  CheckCircle,
+  Info
+} from 'lucide-react';
 
 function App() {
-  const [connectedWallet, setConnectedWallet] = useState('0x38EA...70DCa')
-  const [vvtBalance, setVvtBalance] = useState(15750.50)
-  const [stakedAmount, setStakedAmount] = useState(8500.00)
-  const [pendingRewards, setPendingRewards] = useState(127.85)
-  const [totalStaked, setTotalStaked] = useState(2847500)
-  const [stakingAPY, setStakingAPY] = useState(12.5)
-  const [stakeAmount, setStakeAmount] = useState('')
-  const [unstakeAmount, setUnstakeAmount] = useState('')
-  const [selectedStakingPeriod, setSelectedStakingPeriod] = useState('flexible')
+  const [isConnected, setIsConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState('');
+  const [vvtBalance, setVvtBalance] = useState(0);
+  const [selectedTier, setSelectedTier] = useState(null);
+  const [stakeAmount, setStakeAmount] = useState('');
 
-  // Mock data for charts
+  // REAL CONTRACT ADDRESS - Your deployed VVT token
+  const VVT_CONTRACT_ADDRESS = "0x2e4a...0092ab"; // Replace with your actual contract address from MetaMask transaction
+
+  // HONEST CURRENT STATE - Starting from zero
+  const [platformStats, setPlatformStats] = useState({
+    totalValueLocked: 0,
+    totalStakers: 0,
+    totalRewardsDistributed: 0,
+    averageStake: 0,
+    platformRevenue: 0
+  });
+
+  // REAL STAKING TIERS - These are the actual rates we'll implement
   const stakingTiers = [
-    { name: 'Flexible', apy: 8.5, minAmount: 100, lockPeriod: '0 days', multiplier: '1.0x', color: '#06b6d4' },
-    { name: 'Short Term', apy: 10.0, minAmount: 500, lockPeriod: '30 days', multiplier: '1.1x', color: '#8b5cf6' },
-    { name: 'Medium Term', apy: 12.5, minAmount: 1000, lockPeriod: '90 days', multiplier: '1.25x', color: '#10b981' },
-    { name: 'Long Term', apy: 15.0, minAmount: 2500, lockPeriod: '180 days', multiplier: '1.5x', color: '#f59e0b' },
-    { name: 'Diamond Hands', apy: 18.0, minAmount: 5000, lockPeriod: '365 days', multiplier: '2.0x', color: '#ef4444' }
-  ]
-
-  const rewardsHistory = [
-    { date: 'Sep 25', rewards: 12.5, apy: 11.8, totalStaked: 8200 },
-    { date: 'Sep 26', rewards: 15.2, apy: 12.1, totalStaked: 8350 },
-    { date: 'Sep 27', rewards: 18.7, apy: 12.3, totalStaked: 8400 },
-    { date: 'Sep 28', rewards: 22.1, apy: 12.4, totalStaked: 8450 },
-    { date: 'Sep 29', rewards: 25.8, apy: 12.5, totalStaked: 8500 },
-    { date: 'Sep 30', rewards: 28.9, apy: 12.6, totalStaked: 8500 },
-    { date: 'Oct 01', rewards: 32.4, apy: 12.7, totalStaked: 8500 }
-  ]
-
-  const revenueDistribution = [
-    { name: 'Staking Rewards', value: 45, amount: 12750, color: '#8b5cf6' },
-    { name: 'Platform Revenue', value: 30, amount: 8500, color: '#06b6d4' },
-    { name: 'Transaction Fees', value: 15, amount: 4250, color: '#10b981' },
-    { name: 'Premium Features', value: 10, amount: 2833, color: '#f59e0b' }
-  ]
-
-  const stakingStats = [
-    { metric: 'Total Value Locked', value: '$2,847,500', change: '+15.3%', icon: Lock },
-    { metric: 'Active Stakers', value: '1,247', change: '+8.7%', icon: Users },
-    { metric: 'Average Stake', value: '2,284 VVT', change: '+12.1%', icon: Target },
-    { metric: 'Rewards Distributed', value: '$45,670', change: '+22.4%', icon: Gift }
-  ]
-
-  const withdrawalTiers = [
-    { tier: 'Free User', fee: '3.0%', minStake: '0 VVT', features: ['Basic withdrawal', 'Weekly payouts'] },
-    { tier: 'Bronze Staker', fee: '2.0%', minStake: '100+ VVT', features: ['Reduced fees', 'Bi-weekly payouts'] },
-    { tier: 'Silver Staker', fee: '1.0%', minStake: '500+ VVT', features: ['Low fees', 'Weekly payouts'] },
-    { tier: 'Gold Staker', fee: '0.5%', minStake: '1,000+ VVT', features: ['Minimal fees', 'Daily payouts'] },
-    { tier: 'Diamond Staker', fee: '0.0%', minStake: '2,500+ VVT', features: ['Zero fees', 'Instant payouts', 'Priority support'] }
-  ]
-
-  const calculateRewards = (amount, period) => {
-    const tier = stakingTiers.find(t => t.name.toLowerCase().includes(period.toLowerCase())) || stakingTiers[0]
-    const dailyReward = (amount * tier.apy / 100) / 365
-    return {
-      daily: dailyReward,
-      monthly: dailyReward * 30,
-      yearly: amount * tier.apy / 100,
-      apy: tier.apy
+    {
+      id: 'flexible',
+      name: 'Flexible',
+      apy: 8.5,
+      minAmount: 100,
+      lockPeriod: 0,
+      multiplier: 1.0,
+      withdrawalFee: 2.0,
+      description: 'No lock period, withdraw anytime',
+      benefits: ['Basic staking rewards', 'Reduced withdrawal fees']
+    },
+    {
+      id: 'short',
+      name: 'Short Term',
+      apy: 10.0,
+      minAmount: 500,
+      lockPeriod: 30,
+      multiplier: 1.1,
+      withdrawalFee: 1.5,
+      description: '30-day commitment for higher rewards',
+      benefits: ['10% APY', '1.1x reward multiplier', 'Lower fees']
+    },
+    {
+      id: 'medium',
+      name: 'Medium Term',
+      apy: 12.5,
+      minAmount: 1000,
+      lockPeriod: 90,
+      multiplier: 1.25,
+      withdrawalFee: 1.0,
+      description: '90-day commitment with premium benefits',
+      benefits: ['12.5% APY', '1.25x multiplier', 'Priority support']
+    },
+    {
+      id: 'long',
+      name: 'Long Term',
+      apy: 15.0,
+      minAmount: 2500,
+      lockPeriod: 180,
+      multiplier: 1.5,
+      withdrawalFee: 0.5,
+      description: '180-day commitment for serious stakers',
+      benefits: ['15% APY', '1.5x multiplier', 'Premium features']
+    },
+    {
+      id: 'diamond',
+      name: 'Diamond Hands',
+      apy: 18.0,
+      minAmount: 5000,
+      lockPeriod: 365,
+      multiplier: 2.0,
+      withdrawalFee: 0.0,
+      description: '1-year commitment for maximum rewards',
+      benefits: ['18% APY', '2x multiplier', 'Zero fees', 'Governance rights']
     }
-  }
+  ];
+
+  // Connect to MetaMask
+  const connectWallet = async () => {
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        const accounts = await window.ethereum.request({ 
+          method: 'eth_requestAccounts' 
+        });
+        setWalletAddress(accounts[0]);
+        setIsConnected(true);
+        
+        // Get VVT balance (this would need actual contract integration)
+        // For now, we'll show 0 until real integration
+        setVvtBalance(0);
+        
+      } catch (error) {
+        console.error('Failed to connect wallet:', error);
+        alert('Failed to connect wallet. Please make sure MetaMask is installed.');
+      }
+    } else {
+      alert('Please install MetaMask to use this application.');
+    }
+  };
+
+  // Disconnect wallet
+  const disconnectWallet = () => {
+    setIsConnected(false);
+    setWalletAddress('');
+    setVvtBalance(0);
+  };
+
+  // Handle staking (placeholder - needs real contract integration)
+  const handleStake = async () => {
+    if (!selectedTier || !stakeAmount) {
+      alert('Please select a tier and enter an amount to stake.');
+      return;
+    }
+
+    if (parseFloat(stakeAmount) < selectedTier.minAmount) {
+      alert(`Minimum stake for ${selectedTier.name} tier is ${selectedTier.minAmount} VVT`);
+      return;
+    }
+
+    // This would integrate with your actual smart contract
+    alert(`Staking functionality will be connected to your VVT contract at ${VVT_CONTRACT_ADDRESS}. This requires smart contract integration.`);
+  };
+
+  // Calculate potential rewards
+  const calculateRewards = (amount, tier) => {
+    if (!amount || !tier) return { daily: 0, monthly: 0, yearly: 0 };
+    
+    const principal = parseFloat(amount);
+    const apy = tier.apy / 100;
+    
+    return {
+      daily: (principal * apy) / 365,
+      monthly: (principal * apy) / 12,
+      yearly: principal * apy
+    };
+  };
+
+  const rewards = calculateRewards(stakeAmount, selectedTier);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm dark:bg-gray-900/80 sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
+      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Coins className="h-8 w-8 text-purple-600" />
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                  VVT Staking Platform
-                </h1>
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg">VVT</span>
               </div>
-              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                Live on Ethereum
-              </Badge>
+              <div>
+                <h1 className="text-2xl font-bold text-white">VVT Staking Platform</h1>
+                <p className="text-gray-300 text-sm">ViewerValue Token Staking & Rewards</p>
+              </div>
             </div>
+            
             <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground">Connected Wallet</div>
-                <div className="font-mono text-sm">{connectedWallet}</div>
-              </div>
-              <Button className="bg-gradient-to-r from-purple-600 to-blue-600">
-                <Wallet className="h-4 w-4 mr-2" />
-                Connect Wallet
-              </Button>
+              {isConnected ? (
+                <div className="flex items-center space-x-4">
+                  <div className="text-right">
+                    <p className="text-sm text-gray-300">Connected Wallet</p>
+                    <p className="text-white font-mono text-sm">
+                      {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-300">VVT Balance</p>
+                    <p className="text-white font-bold">{vvtBalance.toLocaleString()} VVT</p>
+                  </div>
+                  <Button onClick={disconnectWallet} variant="outline" size="sm">
+                    Disconnect
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={connectWallet} className="bg-purple-600 hover:bg-purple-700">
+                  <Wallet className="w-4 h-4 mr-2" />
+                  Connect Wallet
+                </Button>
+              )}
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
-        {/* Portfolio Overview */}
+      <div className="container mx-auto px-4 py-8">
+        {/* Transparency Notice */}
+        <Alert className="mb-8 border-blue-500/50 bg-blue-500/10">
+          <Info className="h-4 w-4" />
+          <AlertDescription className="text-blue-100">
+            <strong>Transparency Notice:</strong> This platform is newly launched. All statistics start from zero and will grow as real users begin staking. 
+            The VVT token contract is live on Ethereum mainnet, and staking functionality requires MetaMask integration with the deployed contract.
+          </AlertDescription>
+        </Alert>
+
+        {/* Platform Statistics - HONEST CURRENT STATE */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium opacity-90">VVT Balance</CardTitle>
+          <Card className="bg-black/40 border-white/10">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-300">Total Value Locked</CardTitle>
+              <DollarSign className="h-4 w-4 text-green-400" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold">{vvtBalance.toLocaleString()}</div>
-                  <p className="text-xs opacity-80">≈ ${(vvtBalance * 0.10).toLocaleString()}</p>
-                </div>
-                <Coins className="h-8 w-8 opacity-80" />
-              </div>
+              <div className="text-2xl font-bold text-white">${platformStats.totalValueLocked.toLocaleString()}</div>
+              <p className="text-xs text-gray-400">Starting from $0 - grows with real stakers</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium opacity-90">Staked Amount</CardTitle>
+          <Card className="bg-black/40 border-white/10">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-300">Active Stakers</CardTitle>
+              <Users className="h-4 w-4 text-blue-400" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold">{stakedAmount.toLocaleString()}</div>
-                  <div className="flex items-center text-xs opacity-80">
-                    <Lock className="h-3 w-3 mr-1" />
-                    {stakingAPY}% APY
-                  </div>
-                </div>
-                <Lock className="h-8 w-8 opacity-80" />
-              </div>
+              <div className="text-2xl font-bold text-white">{platformStats.totalStakers}</div>
+              <p className="text-xs text-gray-400">Real users who have staked VVT</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium opacity-90">Pending Rewards</CardTitle>
+          <Card className="bg-black/40 border-white/10">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-300">Rewards Distributed</CardTitle>
+              <TrendingUp className="h-4 w-4 text-purple-400" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold">{pendingRewards.toFixed(2)}</div>
-                  <div className="flex items-center text-xs opacity-80">
-                    <ArrowUpRight className="h-3 w-3 mr-1" />
-                    +2.3 VVT today
-                  </div>
-                </div>
-                <Gift className="h-8 w-8 opacity-80" />
-              </div>
+              <div className="text-2xl font-bold text-white">${platformStats.totalRewardsDistributed.toLocaleString()}</div>
+              <p className="text-xs text-gray-400">Actual rewards paid to stakers</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium opacity-90">Total Earnings</CardTitle>
+          <Card className="bg-black/40 border-white/10">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-300">Platform Status</CardTitle>
+              <Shield className="h-4 w-4 text-green-400" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold">$1,247.50</div>
-                  <div className="flex items-center text-xs opacity-80">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    All-time rewards
-                  </div>
-                </div>
-                <DollarSign className="h-8 w-8 opacity-80" />
-              </div>
+              <div className="text-2xl font-bold text-green-400">LIVE</div>
+              <p className="text-xs text-gray-400">VVT contract deployed on Ethereum</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Staking Interface */}
+        {/* Contract Information */}
+        <Card className="mb-8 bg-black/40 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center">
+              <Shield className="w-5 h-5 mr-2 text-green-400" />
+              Live VVT Token Contract
+            </CardTitle>
+            <CardDescription className="text-gray-300">
+              Your ViewerValue Token is deployed and verified on Ethereum mainnet
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-gray-300">Contract Address</Label>
+                <div className="flex items-center space-x-2 mt-1">
+                  <code className="bg-gray-800 px-3 py-2 rounded text-green-400 font-mono text-sm">
+                    {VVT_CONTRACT_ADDRESS}
+                  </code>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => window.open(`https://etherscan.io/address/${VVT_CONTRACT_ADDRESS}`, '_blank')}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label className="text-gray-300">Token Details</Label>
+                <div className="mt-1 space-y-1">
+                  <p className="text-white text-sm">• Total Supply: 1,000,000 VVT</p>
+                  <p className="text-white text-sm">• Commission: 15% Owner, 65% Users</p>
+                  <p className="text-white text-sm">• Security: OpenZeppelin Standards</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Main Content */}
         <Tabs defaultValue="stake" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-fit">
-            <TabsTrigger value="stake">Stake</TabsTrigger>
-            <TabsTrigger value="rewards">Rewards</TabsTrigger>
-            <TabsTrigger value="tiers">Tiers</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="benefits">Benefits</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 bg-black/40 border-white/10">
+            <TabsTrigger value="stake" className="text-white data-[state=active]:bg-purple-600">
+              Stake VVT
+            </TabsTrigger>
+            <TabsTrigger value="tiers" className="text-white data-[state=active]:bg-purple-600">
+              Staking Tiers
+            </TabsTrigger>
+            <TabsTrigger value="portfolio" className="text-white data-[state=active]:bg-purple-600">
+              My Portfolio
+            </TabsTrigger>
           </TabsList>
 
           {/* Staking Tab */}
           <TabsContent value="stake" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Staking Interface */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Lock className="h-5 w-5 mr-2" />
-                    Stake VVT Tokens
-                  </CardTitle>
-                  <CardDescription>
-                    Lock your VVT tokens to earn rewards and unlock premium features
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="stake-amount">Amount to Stake</Label>
-                      <div className="relative">
-                        <Input
-                          id="stake-amount"
-                          type="number"
-                          placeholder="0.00"
-                          value={stakeAmount}
-                          onChange={(e) => setStakeAmount(e.target.value)}
-                          className="pr-16"
-                        />
-                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
-                          VVT
+            {!isConnected ? (
+              <Card className="bg-black/40 border-white/10">
+                <CardContent className="pt-6">
+                  <div className="text-center py-8">
+                    <Wallet className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-xl font-semibold text-white mb-2">Connect Your Wallet</h3>
+                    <p className="text-gray-300 mb-6">Connect MetaMask to start staking your VVT tokens</p>
+                    <Button onClick={connectWallet} className="bg-purple-600 hover:bg-purple-700">
+                      <Wallet className="w-4 h-4 mr-2" />
+                      Connect MetaMask
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Staking Form */}
+                <Card className="bg-black/40 border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white">Stake VVT Tokens</CardTitle>
+                    <CardDescription className="text-gray-300">
+                      Choose your staking tier and amount to start earning rewards
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label className="text-gray-300">Select Staking Tier</Label>
+                      <div className="grid grid-cols-1 gap-2 mt-2">
+                        {stakingTiers.map((tier) => (
+                          <div
+                            key={tier.id}
+                            className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                              selectedTier?.id === tier.id
+                                ? 'border-purple-500 bg-purple-500/20'
+                                : 'border-white/10 bg-black/20 hover:border-white/20'
+                            }`}
+                            onClick={() => setSelectedTier(tier)}
+                          >
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="text-white font-medium">{tier.name}</p>
+                                <p className="text-gray-400 text-sm">{tier.apy}% APY • {tier.lockPeriod} days</p>
+                              </div>
+                              <Badge variant="secondary" className="bg-purple-600/20 text-purple-300">
+                                {tier.minAmount}+ VVT
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-gray-300">Stake Amount (VVT)</Label>
+                      <Input
+                        type="number"
+                        placeholder="Enter amount to stake"
+                        value={stakeAmount}
+                        onChange={(e) => setStakeAmount(e.target.value)}
+                        className="bg-black/20 border-white/10 text-white"
+                      />
+                      {selectedTier && (
+                        <p className="text-gray-400 text-sm mt-1">
+                          Minimum: {selectedTier.minAmount} VVT
+                        </p>
+                      )}
+                    </div>
+
+                    <Alert className="border-yellow-500/50 bg-yellow-500/10">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription className="text-yellow-100">
+                        <strong>Development Notice:</strong> Staking functionality requires smart contract integration. 
+                        This will connect to your deployed VVT contract for real transactions.
+                      </AlertDescription>
+                    </Alert>
+
+                    <Button 
+                      onClick={handleStake} 
+                      className="w-full bg-purple-600 hover:bg-purple-700"
+                      disabled={!selectedTier || !stakeAmount}
+                    >
+                      <Lock className="w-4 h-4 mr-2" />
+                      Stake VVT Tokens
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Rewards Calculator */}
+                <Card className="bg-black/40 border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white">Rewards Calculator</CardTitle>
+                    <CardDescription className="text-gray-300">
+                      Estimated rewards based on your staking amount and tier
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedTier && stakeAmount ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="text-center">
+                            <p className="text-gray-400 text-sm">Daily</p>
+                            <p className="text-white font-bold">{rewards.daily.toFixed(2)} VVT</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-gray-400 text-sm">Monthly</p>
+                            <p className="text-white font-bold">{rewards.monthly.toFixed(2)} VVT</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-gray-400 text-sm">Yearly</p>
+                            <p className="text-white font-bold">{rewards.yearly.toFixed(2)} VVT</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Stake Amount:</span>
+                            <span className="text-white">{parseFloat(stakeAmount).toLocaleString()} VVT</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">APY:</span>
+                            <span className="text-green-400">{selectedTier.apy}%</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Lock Period:</span>
+                            <span className="text-white">{selectedTier.lockPeriod} days</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Withdrawal Fee:</span>
+                            <span className="text-white">{selectedTier.withdrawalFee}%</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Available: {vvtBalance.toLocaleString()} VVT</span>
-                        <Button variant="link" className="h-auto p-0 text-xs" onClick={() => setStakeAmount(vvtBalance.toString())}>
-                          Max
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="staking-period">Staking Period</Label>
-                      <Select value={selectedStakingPeriod} onValueChange={setSelectedStakingPeriod}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select staking period" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {stakingTiers.map((tier) => (
-                            <SelectItem key={tier.name.toLowerCase().replace(' ', '')} value={tier.name.toLowerCase().replace(' ', '')}>
-                              {tier.name} - {tier.apy}% APY ({tier.lockPeriod})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {stakeAmount && (
-                      <div className="p-4 bg-muted rounded-lg space-y-2">
-                        <div className="text-sm font-medium">Estimated Rewards</div>
-                        {(() => {
-                          const rewards = calculateRewards(parseFloat(stakeAmount) || 0, selectedStakingPeriod)
-                          return (
-                            <div className="grid grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <div className="text-muted-foreground">Daily</div>
-                                <div className="font-medium">{rewards.daily.toFixed(2)} VVT</div>
-                              </div>
-                              <div>
-                                <div className="text-muted-foreground">Monthly</div>
-                                <div className="font-medium">{rewards.monthly.toFixed(2)} VVT</div>
-                              </div>
-                              <div>
-                                <div className="text-muted-foreground">Yearly</div>
-                                <div className="font-medium">{rewards.yearly.toFixed(2)} VVT</div>
-                              </div>
-                            </div>
-                          )
-                        })()}
+                    ) : (
+                      <div className="text-center py-8">
+                        <TrendingUp className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                        <p className="text-gray-400">Select a tier and enter amount to see rewards</p>
                       </div>
                     )}
-                  </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </TabsContent>
 
-                  <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600" size="lg">
-                    <Lock className="h-4 w-4 mr-2" />
-                    Stake VVT Tokens
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Unstaking Interface */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Unlock className="h-5 w-5 mr-2" />
-                    Unstake VVT Tokens
-                  </CardTitle>
-                  <CardDescription>
-                    Withdraw your staked tokens and claim pending rewards
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium">Pending Rewards</span>
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">
-                          Ready to Claim
-                        </Badge>
-                      </div>
-                      <div className="text-2xl font-bold text-green-600">{pendingRewards.toFixed(2)} VVT</div>
-                      <div className="text-sm text-muted-foreground">≈ ${(pendingRewards * 0.10).toFixed(2)}</div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="unstake-amount">Amount to Unstake</Label>
-                      <div className="relative">
-                        <Input
-                          id="unstake-amount"
-                          type="number"
-                          placeholder="0.00"
-                          value={unstakeAmount}
-                          onChange={(e) => setUnstakeAmount(e.target.value)}
-                          className="pr-16"
-                        />
-                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
-                          VVT
-                        </div>
-                      </div>
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Staked: {stakedAmount.toLocaleString()} VVT</span>
-                        <Button variant="link" className="h-auto p-0 text-xs" onClick={() => setUnstakeAmount(stakedAmount.toString())}>
-                          Max
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Button className="w-full bg-green-600 hover:bg-green-700" size="lg">
-                      <Gift className="h-4 w-4 mr-2" />
-                      Claim Rewards ({pendingRewards.toFixed(2)} VVT)
-                    </Button>
-                    <Button variant="outline" className="w-full" size="lg">
-                      <Unlock className="h-4 w-4 mr-2" />
-                      Unstake Tokens
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Staking Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {stakingStats.map((stat, index) => (
-                <Card key={index}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
+          {/* Tiers Tab */}
+          <TabsContent value="tiers">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {stakingTiers.map((tier) => (
+                <Card key={tier.id} className="bg-black/40 border-white/10">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-sm text-muted-foreground">{stat.metric}</p>
-                        <p className="text-2xl font-bold">{stat.value}</p>
-                        <div className="flex items-center text-sm text-green-600">
-                          <ArrowUpRight className="h-3 w-3 mr-1" />
-                          {stat.change}
-                        </div>
+                        <CardTitle className="text-white">{tier.name}</CardTitle>
+                        <CardDescription className="text-gray-300">{tier.description}</CardDescription>
                       </div>
-                      <stat.icon className="h-8 w-8 text-muted-foreground" />
+                      <Badge variant="secondary" className="bg-purple-600/20 text-purple-300">
+                        {tier.apy}% APY
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Minimum Stake:</span>
+                        <span className="text-white">{tier.minAmount.toLocaleString()} VVT</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Lock Period:</span>
+                        <span className="text-white">{tier.lockPeriod} days</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Reward Multiplier:</span>
+                        <span className="text-green-400">{tier.multiplier}x</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Withdrawal Fee:</span>
+                        <span className="text-white">{tier.withdrawalFee}%</span>
+                      </div>
+                      
+                      <div className="pt-3 border-t border-white/10">
+                        <p className="text-gray-400 text-sm mb-2">Benefits:</p>
+                        <ul className="space-y-1">
+                          {tier.benefits.map((benefit, index) => (
+                            <li key={index} className="text-white text-sm flex items-center">
+                              <CheckCircle className="w-3 h-3 mr-2 text-green-400" />
+                              {benefit}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -360,250 +515,85 @@ function App() {
             </div>
           </TabsContent>
 
-          {/* Rewards Tab */}
-          <TabsContent value="rewards" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Rewards History Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Rewards History</CardTitle>
-                  <CardDescription>
-                    Your daily staking rewards and APY performance
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={rewardsHistory}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Area type="monotone" dataKey="rewards" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.3} name="Daily Rewards (VVT)" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Revenue Distribution */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Revenue Sources</CardTitle>
-                  <CardDescription>
-                    How platform revenue is distributed to stakers
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={revenueDistribution}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {revenueDistribution.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value, name) => [`${value}%`, name]} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    {revenueDistribution.map((item, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <div className="text-sm">
-                          <div className="font-medium">{item.name}</div>
-                          <div className="text-muted-foreground">${item.amount.toLocaleString()}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Staking Tiers Tab */}
-          <TabsContent value="tiers" className="space-y-6">
-            <Card>
+          {/* Portfolio Tab */}
+          <TabsContent value="portfolio">
+            <Card className="bg-black/40 border-white/10">
               <CardHeader>
-                <CardTitle>Staking Tiers & APY Rates</CardTitle>
-                <CardDescription>
-                  Choose your staking period to maximize rewards and unlock benefits
+                <CardTitle className="text-white">My Staking Portfolio</CardTitle>
+                <CardDescription className="text-gray-300">
+                  Overview of your staked VVT tokens and rewards
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {stakingTiers.map((tier, index) => (
-                    <Card key={index} className={`relative overflow-hidden ${index === 2 ? 'ring-2 ring-purple-500' : ''}`}>
-                      {index === 2 && (
-                        <div className="absolute top-0 right-0 bg-purple-500 text-white px-3 py-1 text-xs font-medium">
-                          POPULAR
-                        </div>
-                      )}
-                      <CardHeader className="pb-4">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg">{tier.name}</CardTitle>
-                          <div 
-                            className="w-4 h-4 rounded-full" 
-                            style={{ backgroundColor: tier.color }}
-                          />
-                        </div>
-                        <div className="text-3xl font-bold" style={{ color: tier.color }}>
-                          {tier.apy}%
-                          <span className="text-sm font-normal text-muted-foreground ml-1">APY</span>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Min Amount:</span>
-                            <span className="font-medium">{tier.minAmount} VVT</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Lock Period:</span>
-                            <span className="font-medium">{tier.lockPeriod}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Reward Multiplier:</span>
-                            <span className="font-medium">{tier.multiplier}</span>
-                          </div>
-                        </div>
-                        <Button 
-                          className="w-full" 
-                          variant={index === 2 ? "default" : "outline"}
-                          style={index === 2 ? { backgroundColor: tier.color } : {}}
-                        >
-                          Select {tier.name}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* APY Performance */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>APY Performance</CardTitle>
-                  <CardDescription>
-                    Historical APY rates and staking performance
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={rewardsHistory}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Area type="monotone" dataKey="apy" stroke="#10b981" fill="#10b981" fillOpacity={0.3} name="APY %" />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                {!isConnected ? (
+                  <div className="text-center py-8">
+                    <Wallet className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-xl font-semibold text-white mb-2">Connect Wallet</h3>
+                    <p className="text-gray-300 mb-6">Connect your wallet to view your staking portfolio</p>
+                    <Button onClick={connectWallet} className="bg-purple-600 hover:bg-purple-700">
+                      Connect MetaMask
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Staking Growth */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Staking Growth</CardTitle>
-                  <CardDescription>
-                    Your total staked amount over time
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={rewardsHistory}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="totalStaked" fill="#8b5cf6" name="Total Staked (VVT)" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                ) : (
+                  <div className="text-center py-8">
+                    <Lock className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-xl font-semibold text-white mb-2">No Active Stakes</h3>
+                    <p className="text-gray-300 mb-6">You haven't staked any VVT tokens yet. Start staking to earn rewards!</p>
+                    <Button 
+                      onClick={() => document.querySelector('[value="stake"]').click()}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      Start Staking
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Benefits Tab */}
-          <TabsContent value="benefits" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>VVT Staker Benefits</CardTitle>
-                <CardDescription>
-                  Unlock premium features and reduced fees by staking VVT tokens
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {withdrawalTiers.map((tier, index) => (
-                    <div key={index} className={`p-6 rounded-lg border-2 ${
-                      index === withdrawalTiers.length - 1 
-                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' 
-                        : 'border-border'
-                    }`}>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          <div className={`p-2 rounded-full ${
-                            index === withdrawalTiers.length - 1 
-                              ? 'bg-purple-500 text-white' 
-                              : 'bg-muted'
-                          }`}>
-                            {index === withdrawalTiers.length - 1 ? (
-                              <Star className="h-5 w-5" />
-                            ) : (
-                              <Shield className="h-5 w-5" />
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-lg">{tier.tier}</h3>
-                            <p className="text-sm text-muted-foreground">Requires {tier.minStake} staked</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold">{tier.fee}</div>
-                          <div className="text-sm text-muted-foreground">Withdrawal Fee</div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {tier.features.map((feature, featureIndex) => (
-                          <div key={featureIndex} className="flex items-center space-x-2">
-                            <Zap className="h-4 w-4 text-green-500" />
-                            <span className="text-sm">{feature}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Footer */}
+        <footer className="mt-16 pt-8 border-t border-white/10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div>
+              <h3 className="text-white font-semibold mb-4">ViewerValue</h3>
+              <p className="text-gray-400 text-sm">
+                Transforming attention into value through blockchain technology. 
+                Stake VVT tokens to earn rewards and access premium features.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-white font-semibold mb-4">Quick Links</h3>
+              <div className="space-y-2">
+                <a href="https://viewervalue.net" className="text-gray-400 hover:text-white text-sm block">
+                  Main Platform
+                </a>
+                <a href={`https://etherscan.io/address/${VVT_CONTRACT_ADDRESS}`} className="text-gray-400 hover:text-white text-sm block">
+                  View Contract
+                </a>
+                <a href="https://github.com/vvtdev/vvt-staking-platform" className="text-gray-400 hover:text-white text-sm block">
+                  GitHub Repository
+                </a>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-white font-semibold mb-4">Support</h3>
+              <div className="space-y-2">
+                <p className="text-gray-400 text-sm">Email: support@viewervalue.net</p>
+                <p className="text-gray-400 text-sm">Discord: ViewerValue Community</p>
+                <p className="text-gray-400 text-sm">Twitter: @ViewerValue</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-8 pt-4 border-t border-white/10 text-center">
+            <p className="text-gray-400 text-sm">
+              © 2025 ViewerValue Technologies LLC. Built with transparency and honesty.
+            </p>
+          </div>
+        </footer>
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
